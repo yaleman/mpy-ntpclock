@@ -12,10 +12,12 @@ import machine
 import network
 import display
 
-from config import *
-
-UTC_OFFSET_HOURS_LOCAL = 10
-UTC_OFFSET_HOURS_REMOTE = -5
+from config import WIFI_SSID, WIFI_PASSWORD, UTC_OFFSET_HOURS_LOCAL, UTC_OFFSET_HOURS_REMOTE
+try:
+    from config import NTP_HOST
+except ImportError:
+    NTP_HOST = "0.pool.ntp.org"
+print("Using NTP server {}".format(NTP_HOST))
 
 
 TIME_FONT_THICKNESS = 2
