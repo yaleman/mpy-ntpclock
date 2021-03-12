@@ -141,9 +141,9 @@ time_remote = ""
 time_local = ""
 tft.clear()
 check_timer = 0
+prev_local = ""
+prev_remote = ""
 while True:
-    prev_local = time_local
-    prev_remote = time_remote
 
     time_local = time_string(rtc, UTC_OFFSET_HOURS_LOCAL)
     time_remote = time_string(rtc, UTC_OFFSET_HOURS_REMOTE)
@@ -159,6 +159,8 @@ while True:
 
         do_block(x1, y1, "Local", time_local, prev_local)
         do_block(x2, y2, "Remote", time_remote, prev_remote)
+        prev_local = time_local
+        prev_remote = time_remote
     utime.sleep(2)
     check_timer += 1
     if check_timer > 60:
