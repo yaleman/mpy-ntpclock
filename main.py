@@ -12,7 +12,11 @@ import machine
 import network
 import display
 
-from config import WIFI_SSID, WIFI_PASSWORD, UTC_OFFSET_HOURS_LOCAL, UTC_OFFSET_HOURS_REMOTE
+# Time zone file
+#
+# https://github.com/loboris/MicroPython_ESP32_psRAM_LoBo/blob/fff2e193d064effe36a7d456050faa78fe6280a8/MicroPython_BUILD/components/micropython/docs/zones.csv
+
+from config import WIFI_SSID, WIFI_PASSWORD, UTC_OFFSET_HOURS_LOCAL, UTC_OFFSET_HOURS_USA
 try:
     from config import NTP_HOST
 except ImportError:
@@ -137,18 +141,17 @@ TIME_FONT = tft.FONT_7seg
 TITLE_COLOUR = WHITE
 TIME_COLOUR = WHITE
 
-time_remote = ""
+time_usa = ""
 time_local = ""
 tft.clear()
 check_timer = 0
 prev_local = ""
-prev_remote = ""
+prev_usa = ""
 while True:
-
     time_local = time_string(rtc, UTC_OFFSET_HOURS_LOCAL)
-    time_remote = time_string(rtc, UTC_OFFSET_HOURS_REMOTE)
+    time_usa = time_string(rtc, UTC_OFFSET_HOURS_USA)
 
-    if prev_local != time_local or prev_remote != time_remote:
+    if prev_local != time_local or prev_usa != time_usa:
 
         if SCREEN_ROTATION == tft.PORTRAIT:
             x1 = y1 = x2 = 0
@@ -158,12 +161,14 @@ while True:
             x2 = int(SCREEN_WIDTH/2)
 
         do_block(x1, y1, "Local", time_local, prev_local)
-        do_block(x2, y2, "Remote", time_remote, prev_remote)
+        do_block(x2, y2, "USA", time_usa, prev_usa)
         prev_local = time_local
-        prev_remote = time_remote
+        prev_usa = time_usa
     utime.sleep(2)
     check_timer += 1
-    if check_timer > 60:
+    if check_timer > 300:
         print("Synchronizing with NTP")
         rtc.ntp_sync(server=NTP_HOST, tz=RTC_TZ)
         check_timer = 0
+        tft.clear()
+
