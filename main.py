@@ -73,8 +73,10 @@ def do_block(x, y, title, time_text, prev_time_text):
         time_text is printed at 2/3
     """
     tft.font(TITLE_FONT, color=WHITE)
+    block_height_divided = int(BLOCK_HEIGHT/5)
+
     title_x = int(x + (BLOCK_WIDTH/2)) - int(tft.textWidth(title)/2)
-    title_y = int(y + (BLOCK_HEIGHT/3))-int(tft.fontSize()[1]/2)
+    title_y = int(y + block_height_divided)-int(tft.fontSize()[1]/2)
     tft.text(int(title_x),
              int(title_y),
              title,
@@ -86,7 +88,7 @@ def do_block(x, y, title, time_text, prev_time_text):
              color=WHITE,
             )
 
-    time_y = int(y + BLOCK_HEIGHT*(2/3))-int(tft.fontSize()[1]/2)
+    time_y = int(y + (block_height_divided*2))-int(tft.fontSize()[1]/2)
     tft.textClear(get_text_x(x, prev_time_text), time_y, prev_time_text)
     time_x = get_text_x(x, time_text)
     tft.text(time_x, time_y, time_text, TITLE_COLOUR)
