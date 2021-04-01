@@ -24,6 +24,8 @@ except ImportError:
 print("Using NTP server {}".format(NTP_HOST))
 
 
+DAY_ARRAY = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
+
 TIME_FONT_THICKNESS = 2
 
 RTC_TZ = "GMT+0"
@@ -38,15 +40,23 @@ def zfl(s, width):
 def time_string(rtc_object, offset_hours):
     offset_secs = offset_hours * 3600
     rtc_secs = int(utime.mktime(rtc_object.now()))
-    #print(rtc_secs)
     timedata = utime.localtime(rtc_secs+offset_secs)
-    #print(timedata)
 
     hour = str(timedata[3])
     minute = zfl(timedata[4],2)
-
+    print("hour: {}".format(hour))
+    print("minute: {}".format(minute))
     return "{}:{}".format(hour, minute)
-    #return "{0:02d}:{0:02d}".format(hour, minute)
+
+def date_string(rtc_object, offset_hours):
+    offset_secs = offset_hours * 3600
+    rtc_secs = int(utime.mktime(rtc_object.now()))
+    timedata = utime.localtime(rtc_secs+offset_secs)
+
+    dow = DAY_ARRAY[timedata[6]]
+    dom = zfl(timedata[2],2)
+    return "{} {}".format(dow, dom)
+
 
 def do_connect(rtc_object):
     sta_if = network.WLAN(network.STA_IF)
@@ -67,14 +77,23 @@ def do_connect(rtc_object):
 def get_text_x(x, text):
     return int(x + (BLOCK_WIDTH/2)) - int(tft.textWidth(text)/2)
 
-def do_block(x, y, title, time_text, prev_time_text):
+def do_block(x, y, title, date_text, time_text, prev_time_text, prev_date_text):
     """ x/y are the coordinates of the top left of the block
         title is printed at 1/3
-        time_text is printed at 2/3
+        time_text is printed at 1/2
+        date_text is printed somewhere below that
     """
+
+    tft.rect(int(x),
+             int(y),
+             BLOCK_WIDTH,
+             BLOCK_HEIGHT,
+             WHITE
+             )
     tft.font(TITLE_FONT, color=WHITE)
     block_height_divided = int(BLOCK_HEIGHT/5)
 
+    # display the location
     title_x = int(x + (BLOCK_WIDTH/2)) - int(tft.textWidth(title)/2)
     title_y = int(y + block_height_divided)-int(tft.fontSize()[1]/2)
     tft.text(int(title_x),
@@ -83,22 +102,43 @@ def do_block(x, y, title, time_text, prev_time_text):
              TITLE_COLOUR,
              )
 
+    # # display the date
+    date_str_x = int(x + (BLOCK_WIDTH/2)) - int(tft.textWidth(date_text)/2)
+    date_str_y = int(y + block_height_divided*4)-int(tft.fontSize()[1]/2)
+    # # clear the date
+    # tft.textClear(get_text_x(date_str_x, prev_date_text), date_str_y, prev_date_text)
+    # # print the date
+    tft.text(int(date_str_x),
+             int(date_str_y),
+             date_text,
+             WHITE,
+             )
+
+
+    # display the time
     tft.font(TIME_FONT,
              width=TIME_FONT_THICKNESS, # thickness of the bars
              color=WHITE,
             )
 
-    time_y = int(y + (block_height_divided*2))-int(tft.fontSize()[1]/2)
-    tft.textClear(get_text_x(x, prev_time_text), time_y, prev_time_text)
-    time_x = get_text_x(x, time_text)
-    tft.text(time_x, time_y, time_text, TITLE_COLOUR)
-    tft.rect(int(x),
-             int(y),
-             BLOCK_WIDTH,
-             BLOCK_HEIGHT,
-             WHITE
+    time_y = int(BLOCK_HEIGHT/2)-int(tft.fontSize()[1]/2)
+    # clear the old text
+    tft.text(get_text_x(x, prev_time_text),
+             time_y,
+             prev_time_text,
+             BLACK,
              )
-    # print(x, y)
+
+    #tft.textClear(get_text_x(x, prev_time_text),
+    #              time_y,
+    #              prev_time_text)
+    time_x = get_text_x(x, time_text)
+    tft.text(time_x,
+             time_y,
+             time_text,
+             TITLE_COLOUR,
+             )
+
 
 rtc = machine.RTC()
 do_connect(rtc)
@@ -145,15 +185,20 @@ TIME_COLOUR = WHITE
 
 time_usa = ""
 time_local = ""
-tft.clear()
 check_timer = 0
 prev_local = ""
 prev_usa = ""
+prev_date_local = ""
+prev_date_usa = ""
+
 while True:
     time_local = time_string(rtc, UTC_OFFSET_HOURS_LOCAL)
     time_usa = time_string(rtc, UTC_OFFSET_HOURS_USA)
 
-    if prev_local != time_local or prev_usa != time_usa:
+    date_local = date_string(rtc, UTC_OFFSET_HOURS_LOCAL)
+    date_usa = date_string(rtc, UTC_OFFSET_HOURS_USA)
+
+    if (prev_local != time_local) or (prev_usa != time_usa):
 
         if SCREEN_ROTATION == tft.PORTRAIT:
             x1 = y1 = x2 = 0
@@ -161,16 +206,26 @@ while True:
         else:
             x1 = y1 = y2 = 0
             x2 = int(SCREEN_WIDTH/2)
-
-        do_block(x1, y1, "Local", time_local, prev_local)
-        do_block(x2, y2, "USA", time_usa, prev_usa)
+        #x, y, title, date_text, time_text, prev_time_text, prev_date_text
+        do_block(x1, y1, title="Local", time_text=time_local, prev_time_text=prev_local,
+                 date_text=date_local,
+                 prev_date_text=prev_date_local,
+                 )
+        do_block(x2, y2, title="USA", time_text=time_usa, prev_time_text=prev_usa,
+                 date_text=date_usa,
+                 prev_date_text=prev_date_usa,
+                 )
         prev_local = time_local
         prev_usa = time_usa
+
+
+        prev_date_local = date_local
+        prev_date_usa = date_usa
+
     utime.sleep(2)
     check_timer += 1
     if check_timer > 300:
         print("Synchronizing with NTP")
         rtc.ntp_sync(server=NTP_HOST, tz=RTC_TZ)
         check_timer = 0
-        tft.clear()
 
