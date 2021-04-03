@@ -24,7 +24,7 @@ except ImportError:
 print("Using NTP server {}".format(NTP_HOST))
 
 
-DAY_ARRAY = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
+DAY_ARRAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri","Sat", ]
 
 TIME_FONT_THICKNESS = 2
 
@@ -53,7 +53,7 @@ def date_string(rtc_object, offset_hours):
     rtc_secs = int(utime.mktime(rtc_object.now()))
     timedata = utime.localtime(rtc_secs+offset_secs)
 
-    dow = DAY_ARRAY[timedata[6]]
+    dow = DAY_ARRAY[timedata[6]-1]
     dom = zfl(timedata[2],2)
     return "{} {}".format(dow, dom)
 
