@@ -7,19 +7,25 @@ https://github.com/loboris/MicroPython_ESP32_psRAM_LoBo/blob/fff2e193d064effe36a
 
 # import socket
 # import struct
+# import builtins
 import json
 import sys
 
+#pylint: disable=import-error
 import utime
+#pylint: disable=import-error
 import machine
+#pylint: disable=import-error
 import network
+#pylint: disable=import-error
 import display
 
 # Time zone file
 #
 # https://github.com/loboris/MicroPython_ESP32_psRAM_LoBo/blob/fff2e193d064effe36a7d456050faa78fe6280a8/MicroPython_BUILD/components/micropython/docs/zones.csv
 
-from config import WIFI_SSID, WIFI_PASSWORD, UTC_OFFSET_HOURS_LOCAL, UTC_OFFSET_HOURS_USA
+# pylint: disable=line-too-long
+from config import WIFI_SSID, WIFI_PASSWORD, LEFT_TITLE, LEFT_UTC_OFFSET_HOURS, RIGHT_TITLE, RIGHT_UTC_OFFSET_HOURS
 try:
     from config import NTP_HOST
 except ImportError:
@@ -35,12 +41,17 @@ RTC_TZ = "GMT+0"
 # NTP_DELTA = 3155673600
 # UTIME_DELTA = 946684800
 
+
+SCREEN_X = 240
+SCREEN_Y = 135
+
 def zfl(s, width):
-    # Pads the provided string with leading 0's to suit the specified 'chrs' length
-    # Force # characters, fill with leading 0's
+    """ Pads the provided string with leading 0's to suit the specified 'chrs' length
+    # Force # characters, fill with leading 0's """
     return '{:0>{w}}'.format(s, w=width)
 
-def time_string(rtc_object, offset_hours):
+def time_string(rtc_object, offset_hours: int):
+    """ generates a string of the time given an offset in hours """
     offset_secs = offset_hours * 3600
     rtc_secs = int(utime.mktime(rtc_object.now()))
     timedata = utime.localtime(rtc_secs+offset_secs)
@@ -54,6 +65,7 @@ def time_string(rtc_object, offset_hours):
     return retstr
 
 def date_string(rtc_object, offset_hours):
+    """ generates a string of the date given an offset in hours """
     offset_secs = offset_hours * 3600
     rtc_secs = int(utime.mktime(rtc_object.now()))
     timedata = utime.localtime(rtc_secs+offset_secs)
@@ -64,6 +76,7 @@ def date_string(rtc_object, offset_hours):
 
 
 def do_connect(rtc_object):
+    """ does the wifi connection thing """
     sta_if = network.WLAN(network.STA_IF)
     if not sta_if.isconnected():
         print('connecting to network...')
@@ -82,9 +95,14 @@ def do_connect(rtc_object):
     while not rtc_object.synced():
         print("NTP Not Synchronised, attempting to contact {}".format(NTP_HOST))
         utime.sleep(1)
-    print("Time synced, is currently {}".format(time_string(rtc_object, UTC_OFFSET_HOURS_LOCAL)))
+    print("Time synced, is currently {} in {}".format(
+        time_string(rtc_object, LEFT_UTC_OFFSET_HOURS),
+        LEFT_TITLE,
+        )
+    )
 
 def get_text_x(x, text, config):
+    """ returns the x coord of the text """
     return int(x + (config.get('block_width')/2)) - int(config.get('tft').textWidth(text)/2)
 
 def display_error(error_text: str, config: dict):
@@ -105,6 +123,8 @@ def display_error(error_text: str, config: dict):
         for i in range(len(error_text)/txtlen):
             output_text = error_text[i*txtlen:(i*txtlen)+txtlen]
             tft.text(0,i*10, output_text, color=config.get('colours').get('red'))
+
+    # pylint: disable=broad-except
     except Exception as error_message:
         print("")
         print("")
@@ -121,7 +141,8 @@ def display_error(error_text: str, config: dict):
         print(str(error_text))
 
 
-def do_block(config, x, y, title, date_text, time_text, prev_time_text, prev_date_text):
+# pylint: disable=too-many-arguments
+def do_block(config, x, y, title, date_text, time_text, prev_time_text):
     """ x/y are the coordinates of the top left of the block
         title is printed at 1/3
         time_text is printed at 1/2
@@ -189,6 +210,47 @@ def do_block(config, x, y, title, date_text, time_text, prev_time_text, prev_dat
              time_text,
              config.get('title_colour'),
              )
+
+def build_init_config(tft) -> dict:
+    """ builds an initial config dict """
+    config = {
+        'tft' : tft,
+        'colours' : {
+            'black' : (0xFFFFFF - tft.BLACK),
+            'red' : 0xFFFFFF - tft.RED,
+            'white' : 0xFFFFFF - tft.WHITE
+        },
+
+        'title_font' : tft.FONT_DejaVu18,
+        'time_font' : tft.FONT_7seg,
+    }
+
+    config['title_colour'] = config.get('colours').get('white')
+    config['time_colour'] = config.get('colours').get('white')
+    return config
+
+def check_sync_ntp(checktimer, rtcobject):
+    """ synchronises NTP """
+    checktimer += 1
+    if checktimer > 300:
+        print("Synchronizing with NTP")
+        rtcobject.ntp_sync(NTP_HOST, tz=RTC_TZ)
+        checktimer = 0
+    return checktimer
+
+def init_tft(tft, config):
+    """ does the setup things for the screen """
+    tft.init(tft.ST7789,bgr=False,
+            rot=config["SCREEN_ROTATION"],
+            miso=17,backl_pin=4,backl_on=1, mosi=19, clk=18,
+            cs=5, dc=16,
+            )
+    tft.setwin(40,52,320,240)
+    tft.set_bg(config.get('colours').get('black'))
+    tft.set_fg(config.get('colours').get('white'))
+    tft.clear()
+
+
 def main():
     """ main function """
     try:
@@ -196,98 +258,73 @@ def main():
         do_connect(rtc)
 
         tft = display.TFT()
-        config = {
-            'tft' : tft,
-            'colours' : {
-                'black' : (0xFFFFFF - tft.BLACK),
-                'red' : 0xFFFFFF - tft.RED,
-                'white' : 0xFFFFFF - tft.WHITE
-            },
+        config = build_init_config(tft)
 
-            'title_font' : tft.FONT_DejaVu18,
-            'time_font' : tft.FONT_7seg,
-        }
-
-        config['title_colour'] = config.get('colours').get('white')
-        config['time_colour'] = config.get('colours').get('white')
         # RED = 0xFFFFFF - tft.RED
         # BLACK = 0xFFFFFF - tft.BLACK
-        SCREEN_ROTATION = tft.LANDSCAPE
+        config["SCREEN_ROTATION"] = tft.LANDSCAPE
 
-        SCREEN_X = 240
-        SCREEN_Y = 135
+        if config["SCREEN_ROTATION"] == tft.PORTRAIT:
 
-        if SCREEN_ROTATION == tft.PORTRAIT:
-            SCREEN_WIDTH = SCREEN_Y
-            SCREEN_HEIGHT = SCREEN_X
+            config['block_width'] = int(SCREEN_Y)
+            config['block_height'] = int(SCREEN_X / 2)
+        elif config["SCREEN_ROTATION"] == tft.LANDSCAPE:
 
-            config['block_width'] = int(SCREEN_WIDTH)
-            config['block_height'] = int(SCREEN_HEIGHT / 2)
-        elif SCREEN_ROTATION == tft.LANDSCAPE:
-            SCREEN_WIDTH = SCREEN_X
-            SCREEN_HEIGHT = SCREEN_Y
+            config['block_width'] = int(SCREEN_X / 2)
+            config['block_height'] = int(SCREEN_Y)
 
-            config['block_width'] = int(SCREEN_WIDTH / 2)
-            config['block_height'] = int(SCREEN_HEIGHT)
-        print("dumping config")
-        print(json.dumps(config))
-        tft.init(tft.ST7789,bgr=False,
-                rot=SCREEN_ROTATION,
-                miso=17,backl_pin=4,backl_on=1, mosi=19, clk=18,
-                cs=5, dc=16,
-                )
-        tft.setwin(40,52,320,240)
-        tft.set_bg(config.get('colours').get('black'))
+        print("dumping config\n{}".format(json.dumps(config)))
 
 
-        tft.set_fg(config.get('colours').get('white'))
-        tft.clear()
+        init_tft(tft, config)
 
-        time_usa = ""
-        time_local = ""
+        # initial setup things
+        time_right = ""
+        time_left = ""
         check_timer = 0
-        prev_local = ""
-        prev_usa = ""
-        prev_date_local = ""
-        prev_date_usa = ""
+        prev_left = ""
+        prev_right = ""
+        # prev_date_left = ""
+        # prev_date_right = ""
 
         while True:
-            time_local = time_string(rtc, UTC_OFFSET_HOURS_LOCAL)
-            time_usa = time_string(rtc, UTC_OFFSET_HOURS_USA)
+            time_left = time_string(rtc, LEFT_UTC_OFFSET_HOURS)
+            time_right = time_string(rtc, RIGHT_UTC_OFFSET_HOURS)
 
-            date_local = date_string(rtc, UTC_OFFSET_HOURS_LOCAL)
-            date_usa = date_string(rtc, UTC_OFFSET_HOURS_USA)
+            date_left = date_string(rtc, LEFT_UTC_OFFSET_HOURS)
+            date_right = date_string(rtc, RIGHT_UTC_OFFSET_HOURS)
 
-            if (prev_local != time_local) or (prev_usa != time_usa):
+            if (prev_left != time_left) or (prev_right != time_right):
 
-                if SCREEN_ROTATION == tft.PORTRAIT:
+                if config["SCREEN_ROTATION"] == tft.PORTRAIT:
                     x1 = y1 = x2 = 0
-                    y2 = int(SCREEN_HEIGHT/2)
+                    y2 = int(SCREEN_Y/2)
                 else:
                     x1 = y1 = y2 = 0
-                    x2 = int(SCREEN_WIDTH/2)
+                    x2 = int(SCREEN_X/2)
                 #x, y, title, date_text, time_text, prev_time_text, prev_date_text
-                do_block(config, x1, y1, title="Local", time_text=time_local, prev_time_text=prev_local,
-                        date_text=date_local,
-                        prev_date_text=prev_date_local,
+                do_block(config, x1, y1,
+                        title=LEFT_TITLE,
+                        time_text=time_left,
+                        prev_time_text=prev_left,
+                        date_text=date_left,
                         )
-                do_block(config, x2, y2, title="USA", time_text=time_usa, prev_time_text=prev_usa,
-                        date_text=date_usa,
-                        prev_date_text=prev_date_usa,
+                do_block(config, x2, y2,
+                        title=RIGHT_TITLE,
+                        time_text=time_right,
+                        prev_time_text=prev_right,
+                        date_text=date_right,
                         )
-                prev_local = time_local
-                prev_usa = time_usa
+                prev_left = time_left
+                prev_right = time_right
 
-
-                prev_date_local = date_local
-                prev_date_usa = date_usa
+                # prev_date_left = date_left
+                # prev_date_right = date_right
 
             utime.sleep(2)
-            check_timer += 1
-            if check_timer > 300:
-                print("Synchronizing with NTP")
-                rtc.ntp_sync(NTP_HOST, tz=RTC_TZ)
-                check_timer = 0
+            check_timer = check_sync_ntp(check_timer, rtc)
+
+    # pylint: disable=broad-except
     except Exception as error_message:
         display_error(error_message, config)
         sys.exit()
